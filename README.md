@@ -1,1 +1,1 @@
-# income-prediction
+# income_prediction
