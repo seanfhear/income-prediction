@@ -1,71 +1,136 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import cross_val_score
 from sklearn import metrics
-from sklearn.model_selection import KFold
-from sklearn.model_selection import cross_val_score, cross_val_predict
 
-TRAINING_DATA_FILE = '../data/training_data.csv'
-TEST_DATA_FILE = '../data/tcd_ml_2019-20_income_prediction_test_(without_labels).csv'
+TRAINING_DATA_FILE = '../data/training3.csv'
+TEST_DATA_FILE = '../data/tcd ml 2019-20 income prediction test (without labels).csv'
 OUT_FILE = '../data/output.csv'
+TRAINING_OUT_FILE = '../data/training_output.csv'
 
-test_data = pd.read_csv(TEST_DATA_FILE)
-test_data = pd.concat((test_data.drop(columns='Gender'), pd.get_dummies(test_data['Gender'])), axis=1)
-test_data = pd.concat((test_data.drop(columns='University Degree'), pd.get_dummies(test_data['University Degree'])), axis=1)
-test_data = pd.concat((test_data.drop(columns='Country'), pd.get_dummies(test_data['Country'])), axis=1)
-test_data = pd.concat((test_data.drop(columns='Profession'), pd.get_dummies(test_data['Profession'])), axis=1)
+MISSING_VALUES = ['#N/A']
+STR_COLS = ['Gender', 'Profession', 'University Degree', 'Hair Color', 'Country']
+INT_COLS = ['Year of Record', 'Age', 'Size of City', 'Wears Glasses', 'Body Height [cm]']
 
-train_data = pd.read_csv(TRAINING_DATA_FILE)
-train_data = pd.concat((train_data.drop(columns='Gender'), pd.get_dummies(train_data['Gender'])), axis=1)
-train_data = pd.concat((train_data.drop(columns='Degree'), pd.get_dummies(train_data['Degree'])), axis=1)
-train_data = pd.concat((train_data.drop(columns='Country'), pd.get_dummies(train_data['Country'])), axis=1)
-train_data = pd.concat((train_data.drop(columns='Profession'), pd.get_dummies(train_data['Profession'])), axis=1)
+DUMMY_COLS = ['Gender', 'University Degree', 'Profession', 'Hair Color', 'Country']
+IGNORED_COLS = ['Income in EUR']
+COLS_TO_CLEAN = ['Gender', 'University Degree', 'Age']
+COLS_TO_SCALE = ['Year of Record', 'Age', 'Size of City']
 
-missing_cols = set(train_data.columns) - set(test_data.columns)
-for c in missing_cols:
-    test_data[c] = 0
-test_data = test_data[train_data.columns]
+DROPPED_COLS = ['Instance']
 
-dropped_test_cols = ["Instance", "Size of City", "Income in EUR"]
-X_test = test_data.drop(dropped_test_cols, axis=1).values.reshape(-1, len(test_data.columns) - len(dropped_test_cols))
 
-dropped_train_cols = ["Instance", "Income in EUR", "Size of City"]
-X_train = train_data.drop(dropped_train_cols, axis=1).values.reshape(-1, len(train_data.columns) - len(dropped_train_cols))
-y_train = train_data["Income in EUR"].values.reshape(-1, 1)
+def get_df_from_csv(filename):
+    df = pd.read_csv(filename, na_values=MISSING_VALUES)
+    clean_data(df)
+    return df
 
-model = LinearRegression()
 
-# kf = KFold(n_splits=5)
-# kf.get_n_splits(X)
-# for train_index, test_index in kf.split(X):
-#     X_train, X_test = X[train_index], X[test_index]
-#     y_train, y_test = y[train_index], y[test_index]
-#     model.fit(X_train, y_train)
-#     y_pred = model.predict(X_test)
-#     print(np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+def encode_df(df):
+    for col in DUMMY_COLS:
+        df = pd.concat((df.drop(columns=col), pd.get_dummies(df[col], drop_first=True)), axis=1)
+    return df
 
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
-model.fit(X_train, y_train)
 
-y_pred = model.predict(X_test)
-pd.DataFrame(y_pred).to_csv(OUT_FILE, header=None, index=None)
-# out_df = pd.read_csv(TEST_DATA_FILE)
-# out_df = out_df[["Instance"]]
-# print(out_df)
-# out_df = pd.concat(pd.DataFrame(y_pred), [out_df])
-# print(out_df)
-# out_df.to_csv(OUT_FILE, header=None, index=None)
+def clean_data(df):
+    for col in STR_COLS:
+        clean_str_col(df, col)
 
-# print(np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+    for col in INT_COLS:
+        clean_int_col(df, col)
 
-# plt.scatter(y_test, y_pred)
-# plt.show()
+    df['Gender'] = df['Gender'].replace('0', 'unknown')
+    df['University Degree'] = df['University Degree'].replace('0', 'unknown')
+    df['University Degree'] = df['University Degree'].replace('none', 'unknown')
+    df['Hair Color'] = df['Hair Color'].replace('0', 'unknown')
 
-# df = pd.DataFrame({'Actual': y_test.flatten(), 'Predicted': y_pred.flatten()})
-# print(df)
+    for col in COLS_TO_SCALE:
+        normalize_col(df, col)
 
-# scores = cross_val_score(model, X, y, cv=5)
-# print("Cross-validated scores:", scores)
+def clean_str_col(df, col):
+    df[col].fillna('unknown', inplace=True)
+
+
+def clean_int_col(df, col):
+    median = df[col].median()
+    df[col].fillna(median, inplace=True)
+
+
+def normalize_col(df, col):
+    max_value = df[col].max()
+    min_value = df[col].min()
+    df[col] = (df[col] - min_value) / (max_value - min_value)
+
+
+def get_train_and_test():
+    df_train = get_df_from_csv(TRAINING_DATA_FILE)
+    df_test = get_df_from_csv(TEST_DATA_FILE)
+
+    # https://medium.com/@vaibhavshukla182/how-to-solve-mismatch-in-train-and-test-set-after-categorical-encoding-8320ed03552f
+    df_train['train'] = 1
+    df_test['train'] = 0
+
+    for col in DROPPED_COLS:
+        df_train = df_train.drop([col], axis=1)
+        df_test = df_test.drop([col], axis=1)
+
+    combined = pd.concat([df_train, df_test])
+    combined = encode_df(combined)
+
+    df_train = combined[combined['train'] == 1]
+    df_test = combined[combined['train'] == 0]
+    df_train = df_train.drop(['train'], axis=1)
+    df_test = df_test.drop(['train'], axis=1)
+
+    return df_train, df_test
+
+
+def train_and_test(df_train):
+    x = df_train.drop(['Income in EUR'], axis=1).values.reshape(-1, len(df_train.columns) - len(IGNORED_COLS))
+    y = df_train['Income in EUR'].values.reshape(-1, 1)
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.1, random_state=0)
+    model = LinearRegression()
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_test)
+
+    print(np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+
+    df = pd.DataFrame({'Actual': y_test.flatten(), 'Predicted': y_pred.flatten()})
+    df.to_csv(TRAINING_OUT_FILE)
+
+
+def cross_val_train(df_train):
+    x = df_train.drop(['Income in EUR'], axis=1).values.reshape(-1, len(df_train.columns) - len(IGNORED_COLS))
+    y = df_train['Income in EUR'].values.reshape(-1, 1)
+
+    model = LinearRegression()
+    scores = cross_val_score(model, x, y, cv=5)
+    print(scores)
+    for i, score in enumerate(scores):
+        print('{}: {}'.format(i+1, np.sqrt(score * -1)))
+
+
+def main_event(df_train, df_test):
+    x_train = df_train.drop(IGNORED_COLS, axis=1).values.reshape(-1, len(df_train.columns) - len(IGNORED_COLS))
+    y_train = df_train["Income in EUR"].values.reshape(-1, 1)
+
+    model = LinearRegression()
+    model.fit(x_train, y_train)
+
+    x_test = df_test.drop(IGNORED_COLS, axis=1).values.reshape(-1, len(df_train.columns) - len(IGNORED_COLS))
+    y_pred = model.predict(x_test)
+
+    df = pd.DataFrame({'Predicted': y_pred.flatten()})
+    df.to_csv(OUT_FILE)
+
+
+if __name__ == "__main__":
+    train, test = get_train_and_test()
+
+    train_and_test(train)
+    # cross_val_train(train)
+    # main_event(train, test)
