@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
 from sklearn import metrics
 
 TRAINING_DATA_FILE = '../data/training.csv'
@@ -10,14 +11,15 @@ OUT_FILE = '../data/output.csv'
 TRAINING_OUT_FILE = '../data/training_output.csv'
 
 MISSING_VALUES = ['#N/A']
-STR_COLS = ['Gender', 'Profession', 'University Degree', 'Hair Color']
+STR_COLS = ['Gender', 'Profession', 'University Degree', 'Hair Color', 'Country']
 INT_COLS = ['Year of Record', 'Age', 'Size of City', 'Wears Glasses', 'Body Height [cm]']
 
-DUMMY_COLS = ['Gender', 'University Degree', 'Profession', 'Hair Color']
+DUMMY_COLS = ['Gender', 'University Degree', 'Profession', 'Hair Color', 'Country']
 IGNORED_COLS = ['Income in EUR']
 COLS_TO_CLEAN = ['Gender', 'University Degree', 'Age']
 
-DROPPED_COLS = ['Country']
+DROPPED_COLS = []
+
 
 def get_df_from_csv(filename):
     """
@@ -66,8 +68,9 @@ def get_train_and_test():
     df_train['train'] = 1
     df_test['train'] = 0
 
-    df_train = df_train.drop(['Country'], axis=1)
-    df_test = df_test.drop(['Country'], axis=1)
+    for col in DROPPED_COLS:
+        df_train = df_train.drop([col], axis=1)
+        df_test = df_test.drop([col], axis=1)
 
     combined = pd.concat([df_train, df_test])
     combined = encode_df(combined)
@@ -84,7 +87,7 @@ def train_and_test(df_train):
     x = df_train.drop(['Income in EUR'], axis=1).values.reshape(-1, len(df_train.columns) - len(IGNORED_COLS))
     y = df_train['Income in EUR'].values.reshape(-1, 1)
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.1, random_state=0)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=0)
     model = LinearRegression()
     model.fit(x_train, y_train)
 
@@ -94,6 +97,17 @@ def train_and_test(df_train):
 
     df = pd.DataFrame({'Actual': y_test.flatten(), 'Predicted': y_pred.flatten()})
     df.to_csv(TRAINING_OUT_FILE)
+
+
+def cross_val_train(df_train):
+    x = df_train.drop(['Income in EUR'], axis=1).values.reshape(-1, len(df_train.columns) - len(IGNORED_COLS))
+    y = df_train['Income in EUR'].values.reshape(-1, 1)
+
+    model = LinearRegression()
+    scores = cross_val_score(model, x, y, cv=5)
+    print(scores)
+    for i, score in enumerate(scores):
+        print('{}: {}'.format(i+1, np.sqrt(score * -1)))
 
 
 def main_event(df_train, df_test):
@@ -111,5 +125,7 @@ def main_event(df_train, df_test):
 
 
 train, test = get_train_and_test()
-train_and_test(train)
-# main_event(train, test)
+
+# train_and_test(train)
+# cross_val_train(train)
+main_event(train, test)

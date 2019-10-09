@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
-TRAINING_DATA_FILE = '../data/training_data.csv'
+TRAINING_DATA_FILE = '../data/training.csv'
 
 def plot_feature_against_income(feature, sort_by_income=False):
     data = pd.read_csv(TRAINING_DATA_FILE)
@@ -20,6 +20,7 @@ def plot_feature_against_income(feature, sort_by_income=False):
     #feature_data.plot()
 
     feature_data.plot(x=feature, y='Income in EUR', style='o')
+    plt.xscale('log')
     plt.show()
 
-#plot_feature_against_income("Year of Record")
+plot_feature_against_income("Size of City")
