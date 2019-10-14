@@ -74,7 +74,7 @@ def clean_data(df, training):
     :param training: Whether the data is the training set or not
     :return:
     """
-    process_professions(df, training)
+    # process_professions(df, training)
     df["Income in EUR"] = pd.to_numeric(df["Income in EUR"])
 
     for col in UNKNOWN_COLS:
@@ -283,4 +283,4 @@ def main(train):
 
 
 if __name__ == "__main__":
-    main(train=1)
+    main(train=0)
