@@ -3,9 +3,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn import metrics
-from sklearn.preprocessing import LabelEncoder
 import matplotlib.pylab as plt
-import xgboost as xg
 
 
 TRAINING_DATA_FILE = '../data/training4.csv'
@@ -19,7 +17,7 @@ UNKNOWN_COLS = ['Age', 'Year of Record', 'Country', 'Profession']
 DUMMY_COLS = ['Country', 'Gender', 'University Degree', 'Profession']
 
 COLS_TO_CONVERT_SPARSE = ['Country', 'Profession']
-LOW_FREQUENCY_THRESHOLD = 5
+LOW_FREQUENCY_THRESHOLD = 0
 
 COLS_TO_TRANSFORM = ['Income in EUR']
 INCOME_OUTLIER_THRESHOLD = np.log(4000000)
@@ -53,21 +51,6 @@ def oh_encode(df):
     return df
 
 
-def process_professions(df, training):
-    """
-    Perform specific actions on the Profession feature
-    :param df:
-    :param training: Whether the data is the training set or not
-    :return:
-    """
-    mean_salaries = df.groupby('Profession')['Income in EUR'].mean()
-    # print(mean_salaries['Accounts Clerk'])
-
-    remove_unknowns(df, 'Profession', training)
-    le = LabelEncoder()
-    df['Profession'] = le.fit_transform(df['Profession'])
-
-
 def clean_data(df, training):
     """
     Cleans the data by unifying different types of unknowns, transforming columns defined
@@ -76,15 +59,12 @@ def clean_data(df, training):
     :param training: Whether the data is the training set or not
     :return:
     """
-    # process_professions(df, training)
-
     for col in UNKNOWN_COLS:
         df = remove_unknowns(df, col, training)
 
     df['Gender'] = df['Gender'].replace('0', 'unknown')
     df['University Degree'] = df['University Degree'].replace('0', 'unknown')
     df['University Degree'] = df['University Degree'].replace('none', 'unknown')
-    df['Hair Color'] = df['Hair Color'].replace('0', 'unknown')
 
     for col in COLS_TO_TRANSFORM:
         transform_col(df, col)
@@ -113,8 +93,8 @@ def clean_num_col(df, col):
     :param col:
     :return:
     """
-    median = df[col].median()
-    df[col].fillna(median, inplace=True)
+    mean = df[col].mean()
+    df[col].fillna(mean, inplace=True)
 
 
 def remove_unknowns(df, col, training):
@@ -129,7 +109,7 @@ def remove_unknowns(df, col, training):
         df[col].fillna('unknown', inplace=True)
         df = df[df[col] != 'unknown']
     else:
-        if col in ['Age', 'Year of Record']:
+        if col in ['Age', 'Year of Record', 'Body Height [cm]']:
             clean_num_col(df, col)
         else:
             clean_str_col(df, col)
@@ -232,7 +212,6 @@ def cross_val_train(df_train, model):
         y_train, y_test = y[train_index], y[test_index]
 
         model.fit(x_train, y_train.ravel())
-
         y_pred = model.predict(x_test)
 
         df = pd.DataFrame({'Actual': y_test.flatten(), 'Predicted': y_pred.flatten()})
@@ -295,4 +274,4 @@ def main(train):
 
 
 if __name__ == "__main__":
-    main(train=1)
+    main(train=0)
