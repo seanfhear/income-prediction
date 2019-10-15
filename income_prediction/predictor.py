@@ -152,6 +152,10 @@ def transform_col(df, col):
     """
     df[col] = df[col].apply(np.log)
 
+    # use below to include negatives
+    # df[col][df[col] < 0] = ((df[col][df[col] < 0] * -1).apply(np.log)) * -1
+    # df[col][df[col] > 0] = ((df[col][df[col] > 0]).apply(np.log))
+
 
 def untransform_col(df, col):
     """
@@ -161,6 +165,10 @@ def untransform_col(df, col):
     :return:
     """
     df[col] = df[col].apply(np.exp)
+
+    # use below to include negatives
+    # df[col][df[col] < 0] = ((df[col][df[col] < 0] * -1).apply(np.exp)) * -1
+    # df[col][df[col] > 0] = ((df[col][df[col] > 0]).apply(np.exp))
 
 
 def get_train_and_test():
