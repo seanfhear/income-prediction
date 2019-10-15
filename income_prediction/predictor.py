@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression, SGDRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn import metrics
 from sklearn.preprocessing import LabelEncoder
 import matplotlib.pylab as plt
+import xgboost as xg
 
 
 TRAINING_DATA_FILE = '../data/training4.csv'
@@ -20,9 +21,10 @@ DUMMY_COLS = ['Country', 'Gender', 'University Degree', 'Profession']
 COLS_TO_CONVERT_SPARSE = ['Country', 'Profession']
 LOW_FREQUENCY_THRESHOLD = 5
 
-COLS_TO_TRANSFORM = ['Size of City']
+COLS_TO_TRANSFORM = ['Income in EUR']
+INCOME_OUTLIER_THRESHOLD = np.log(4000000)
 
-DROPPED_COLS = ['Instance', 'Hair Color']
+DROPPED_COLS = ['Instance', 'Hair Color', 'Size of City']
 TARGET_COLUMN = 'Income in EUR'
 
 NUM_FOLDS = 3
@@ -75,7 +77,6 @@ def clean_data(df, training):
     :return:
     """
     # process_professions(df, training)
-    df["Income in EUR"] = pd.to_numeric(df["Income in EUR"])
 
     for col in UNKNOWN_COLS:
         df = remove_unknowns(df, col, training)
@@ -143,7 +144,7 @@ def remove_outliers(df, training):
     :return:
     """
     if training:
-        df = df[df[TARGET_COLUMN] < 4000000]
+        df = df[df[TARGET_COLUMN] < INCOME_OUTLIER_THRESHOLD]
     return df
 
 
@@ -170,6 +171,16 @@ def transform_col(df, col):
     :return:
     """
     df[col] = df[col].apply(np.log)
+
+
+def untransform_col(df, col):
+    """
+    Reverse the log transform
+    :param df:
+    :param col:
+    :return:
+    """
+    df[col] = df[col].apply(np.exp)
 
 
 def get_train_and_test():
@@ -225,13 +236,18 @@ def cross_val_train(df_train, model):
         y_pred = model.predict(x_test)
 
         df = pd.DataFrame({'Actual': y_test.flatten(), 'Predicted': y_pred.flatten()})
+        untransform_col(df, 'Actual')
+        untransform_col(df, 'Predicted')
         df.to_csv(TRAINING_OUT_FILE)
 
-        rmse_sum += np.sqrt(metrics.mean_squared_error(y_test, y_pred))
-        print(np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+        y_pred = df['Predicted'].values.reshape(-1, 1)
+        y_actual = df['Actual'].values.reshape(-1, 1)
+
+        rmse_sum += np.sqrt(metrics.mean_squared_error(y_actual, y_pred))
+        print(np.sqrt(metrics.mean_squared_error(y_actual, y_pred)))
 
         fig, ax = plt.subplots(figsize=(16, 8))
-        ax.scatter(y_test, y_pred)
+        ax.scatter(y_actual, y_pred)
         ax.set_xlabel('y_test')
         ax.set_ylabel('y_pred')
         plt.plot([-50000, 2500000], [-50000, 2500000], color='red', linewidth=2)
@@ -260,6 +276,7 @@ def get_predictions(df_train, df_test, model):
     y_pred = model.predict(x_test)
 
     df = pd.DataFrame({'Predicted': y_pred.flatten()})
+    untransform_col(df, 'Predicted')
     df.to_csv(OUT_FILE)
 
 
@@ -271,11 +288,6 @@ def main(train):
     """
     train_data, test_data = get_train_and_test()
     model = LinearRegression()
-    # model = SGDRegressor(
-    #     loss="squared_loss",
-    #     penalty="elasticnet",
-    #     alpha=0.000001
-    # )
     if train:
         cross_val_train(train_data, model)
     else:
@@ -283,4 +295,4 @@ def main(train):
 
 
 if __name__ == "__main__":
-    main(train=0)
+    main(train=1)

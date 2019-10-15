@@ -19,4 +19,4 @@ def scatter_plot(df, col):
 
 
 df_train, _ = predictor.get_train_and_test()
-scatter_plot(df_train, 'Profession')
+scatter_plot(df_train, 'Size of City')
