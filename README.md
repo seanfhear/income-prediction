@@ -1,1 +1,3 @@
-# income_prediction
+# Linear Regression to predict income
+
+![](graph.png)
